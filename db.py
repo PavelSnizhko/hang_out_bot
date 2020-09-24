@@ -48,7 +48,9 @@ class SQLWorker:
         with self.connection:
             self.cursor.execute('Delete from place where user_id = ?', (user_id,))
 
-
+    def get_all_photos(self, user_id):
+        with self.connection:
+            return self.cursor.execute('SELECT `photo` from place where user_id=?', (user_id,)).fetchall()
 
     def close(self):
         """ Закрываем текущее соединение с БД """

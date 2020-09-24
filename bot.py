@@ -3,6 +3,7 @@ from collections import defaultdict
 from db import SQLWorker
 import requests
 import config
+import os
 
 bot = telebot.TeleBot(config.TOKEN, parse_mode=None)
 
@@ -19,13 +20,16 @@ def get_img(message):
         new_file.write(downloaded_file)
     return new_file.name
 
+
 def output_place(message, data):
     try:
         bot.send_message(message.chat.id, data[5])
+        print(data[2])
         sent_photo(data[2], message)
         bot.send_location(message.chat.id, data[3], data[4])
     except KeyError as err:
         bot.send_message(message.chat.id, err)
+
 
 def sent_photo(url, message):
     try:
@@ -35,9 +39,10 @@ def sent_photo(url, message):
     except FileNotFoundError:
         bot.send_message(message.chat.id, "Фото відсутнє")
 
-def get_important_location(message):
+
+def get_near_locations(message):
     """Getting location all location from db and compare with user location """
-    finded_places = []
+    found_places = []
     records = db.select_all(message.chat.id)
     if len(records) > 0:
         for record in records:
@@ -49,11 +54,11 @@ def get_important_location(message):
                 response = requests.get(url).json()
                 distance = float(response['rows'][0]['elements'][0]['distance']['text'].split(' ')[0])
                 if distance <= 0.5:
-                    finded_places.append(record)
+                    found_places.append(record)
             except Exception as ex:
                 bot.send_message(message.chat.id, ex)
-        if len(finded_places) > 0:
-            for place in finded_places:
+        if len(found_places) > 0:
+            for place in found_places:
                 output_place(message, place)
         else:
             bot.send_message(message.chat.id, "Локаций в районе 500 метров не обнаружено")
@@ -67,7 +72,7 @@ def get_important_location(message):
 @bot.message_handler(commands=['near_locations'])
 def handle_home_position(message):
     bot.send_message(message.chat.id, text="Отправь локацию на что бы узнать есть ли здесь какие-нибудь места")
-    bot.register_next_step_handler(message, get_important_location)
+    bot.register_next_step_handler(message, get_near_locations)
 
 
 
@@ -148,8 +153,19 @@ def handle_adding(message):
 
 @bot.message_handler(commands=['reset'])
 def handle_removing(message):
+    users_photos = db.get_all_photos(message.chat.id)
+    print(users_photos)
+    remove_from_media(users_photos)
     db.remove_all_records(message.chat.id)
     bot.send_message(message.chat.id, 'Удалено все локации')
+
+
+def remove_from_media(user_photos):
+    photos = list(map(lambda photo_path: photo_path[5:], user_photos))
+    for filename in os.listdir("media/"):
+        if filename in photos:
+            os.remove(filename)
+
 
 
 @bot.message_handler(commands=['list'])
