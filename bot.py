@@ -9,9 +9,9 @@ import config
 import os
 
 #try to get heroku variable
-TOKEN = os.getenv("TOKEN", config.TOKEN)
-API_KEY = os.getenv("API_KEY", config.GOOGLE_API_KEY)
-
+TOKEN = os.getenv("TOKEN")
+API_KEY = os.getenv("API_KEY")
+url_media = "/media"
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 db = SQLWorker('places.db')
