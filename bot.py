@@ -204,3 +204,4 @@ def handle_showing(message):
 if __name__ == '__main__':
 
     db.close()
+    bot.polling()
