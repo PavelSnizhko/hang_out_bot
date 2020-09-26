@@ -5,7 +5,6 @@ from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from db import SQLWorker
 import requests
-import config
 import os
 
 #try to get heroku variable
