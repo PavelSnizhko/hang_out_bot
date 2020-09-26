@@ -8,10 +8,15 @@ import requests
 import config
 import os
 
-bot = telebot.TeleBot(config.TOKEN, parse_mode=None)
+#try to get heroku variable
+TOKEN = os.getenv("TOKEN", config.TOKEN)
+API_KEY = os.getenv("API_KEY", config.GOOGLE_API_KEY)
+
+bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 db = SQLWorker('places.db')
 db.set_up()
+
 
 
 
@@ -64,7 +69,7 @@ def get_near_locations(message):
         for record in records:
             origins = f"{message.location.latitude},{message.location.longitude}"
             destinations = f"{record[3]},{record[4]}"
-            url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origins}&destinations={destinations}&key="+config.GOOGLE_API_KEY
+            url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origins}&destinations={destinations}&key="+API_KEY
             try:
                 response = requests.get(url).json()
                 distance = float(response['rows'][0]['elements'][0]['distance']['text'].split(' ')[0])
@@ -198,5 +203,5 @@ def handle_showing(message):
 
 
 if __name__ == '__main__':
-    bot.polling()
+
     db.close()
