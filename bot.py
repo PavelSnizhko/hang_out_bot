@@ -204,9 +204,7 @@ def handle_showing(message):
 if __name__ == '__main__':
     if "HEROKU" in list(os.environ.keys()):
         logger = telebot.logger
-        telebot.logger.setLevel(logging.INFO)
-
-        server = Flask(__name__)
+        # telebot.logger.setLevel(logging.INFO)
 
 
         @server.route("/bot", methods=['POST'])
