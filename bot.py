@@ -58,7 +58,7 @@ def sent_photo(url, message):
             img = f.read()
         bot.send_photo(message.chat.id, photo=img)
     except FileNotFoundError:
-        bot.send_message(message.chat.id, "Фото відсутнє")
+        bot.send_message(message.chat.id, "Без фото")
 
 
 def get_near_locations(message):
@@ -81,9 +81,9 @@ def get_near_locations(message):
             for place in found_places:
                 output_place(message, place)
         else:
-            bot.send_message(message.chat.id, "Локаций в районе 500 метров не обнаружено")
+            bot.send_message(message.chat.id, "Локаций в районе 2 километров не обнаружено")
     else:
-        bot.send_message(message.chat.id, text="У вас нету сохраненных мест")
+        bot.send_message(message.chat.id, text="У вас нету сохраненных мест нажмите /add что б добвить новое место")
 
 
 
@@ -116,6 +116,7 @@ def handle_adding(message) -> None:
 
     if get_state(message) == start:
         if message.text.lower() == 'нет':
+            product_state = defaultdict(lambda: {})
             bot.register_next_step_handler(message, describe_option)
         else:
             bot.send_message(message.chat.id, text='Напишите название')
@@ -155,6 +156,7 @@ def handle_adding(message) -> None:
 
     @bot.message_handler(func=lambda message: get_state(message) == success, content_types=['text'])
     def success_handle(message):
+        global product_state
         if message.text.lower() != 'нет':
             data = product_state[message.chat.id]
             data['user_id'] = message.chat.id
@@ -171,6 +173,7 @@ def handle_adding(message) -> None:
             bot.send_message(message.chat.id, text='Успешно отправленно')
             update_state(message, state=start)
         else:
+            product_state = defaultdict(lambda: {})
             bot.register_next_step_handler(message, describe_option)
 
 
