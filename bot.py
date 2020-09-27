@@ -9,7 +9,7 @@ import os
 #try to get heroku variable
 TOKEN = os.getenv("TOKEN")
 API_KEY = os.getenv("API_KEY")
-url_media = "/media"
+url_media = os.path
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 db = SQLWorker('places.db')
@@ -36,6 +36,8 @@ def get_img(message) -> str:
     file_id = message.photo[-1].file_id
     file_info = bot.get_file(file_id)
     downloaded_file = bot.download_file(file_info.file_path)
+    if not os.path.exists('media'):
+        os.makedirs('media')
     with open(f"media/image_{file_id}.jpg", 'wb') as new_file:
         new_file.write(downloaded_file)
     return new_file.name
@@ -182,11 +184,12 @@ def handle_removing(message):
 
 def remove_from_media(user_photos):
     photos = list(map(lambda photo_path: photo_path[0][6:], user_photos))
-    file_list = [f for f in os.listdir("media/") if f in photos]
-    for f in file_list:
-        os.remove(os.path.join("media/", f))
-
-    print(os.listdir("media/"))
+    try:
+        file_list = [f for f in os.listdir("media/") if f in photos]
+        for f in file_list:
+            os.remove(os.path.join("media/", f))
+    except OSError:
+        pass
 
 
 
