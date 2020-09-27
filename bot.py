@@ -1,6 +1,6 @@
 import telebot
 from collections import defaultdict
-
+import loggin
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from db import SQLWorker
@@ -202,28 +202,7 @@ def handle_showing(message):
 
 
 if __name__ == '__main__':
-    if "HEROKU" in list(os.environ.keys()):
-        logger = telebot.logger
-        # telebot.logger.setLevel(logging.INFO)
+    bot.polling(none_stop=True)
 
-
-        @server.route("/bot", methods=['POST'])
-        def getMessage():
-            bot.process_new_updates([telebot.types.Update.de_json(request.stream.read().decode("utf-8"))])
-            return "!", 200
-
-
-        @server.route("/")
-        def webhook():
-            bot.remove_webhook()
-            bot.set_webhook(
-                url="https://min-gallows.herokuapp.com/bot")  # этот url нужно заменить на url вашего Хероку приложения
-            return "?", 200
-
-    else:
-        # если переменной окружения HEROKU нету, значит это запуск с машины разработчика.
-        # Удаляем вебхук на всякий случай, и запускаем с обычным поллингом.
-        bot.remove_webhook()
-        bot.polling(none_stop=True)
 
 
