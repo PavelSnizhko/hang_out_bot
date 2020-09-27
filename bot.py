@@ -73,7 +73,7 @@ def get_near_locations(message):
             try:
                 response = requests.get(url).json()
                 distance = float(response['rows'][0]['elements'][0]['distance']['text'].split(' ')[0])
-                if distance <= 0.5:
+                if distance <= 2:
                     found_places.append(record)
             except Exception as ex:
                 bot.send_message(message.chat.id, ex)
