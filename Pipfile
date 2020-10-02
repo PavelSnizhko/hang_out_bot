@@ -9,6 +9,7 @@ verify_ssl = true
 pytelegrambotapi = "*"
 gunicorn = "*"
 flask = "*"
+loguru = "*"
 
 [requires]
 python_version = "3.8"

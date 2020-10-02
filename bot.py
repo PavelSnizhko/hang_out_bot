@@ -1,12 +1,14 @@
 import telebot
 from collections import defaultdict
-from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
+from loguru import logger
 
 from db import SQLWorker
 import requests
 import os
+from telebot import types
 
-#try to get heroku variable
+logger.add("debug.log", format="{time} {level} {message}", level="DEBUG", rotation="10:00", compression="zip")
+# try to get heroku variable
 TOKEN = os.getenv("TOKEN")
 API_KEY = os.getenv("API_KEY")
 url_media = os.path
@@ -14,8 +16,6 @@ bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 db = SQLWorker('places.db')
 db.set_up()
-
-
 
 
 @bot.message_handler(commands=['start', 'help'])
@@ -69,7 +69,7 @@ def get_near_locations(message):
         for record in records:
             origins = f"{message.location.latitude},{message.location.longitude}"
             destinations = f"{record[3]},{record[4]}"
-            url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origins}&destinations={destinations}&key="+API_KEY
+            url = f"https://maps.googleapis.com/maps/api/distancematrix/json?origins={origins}&destinations={destinations}&key=" + API_KEY
             try:
                 response = requests.get(url).json()
                 distance = float(response['rows'][0]['elements'][0]['distance']['text'].split(' ')[0])
@@ -86,14 +86,17 @@ def get_near_locations(message):
         bot.send_message(message.chat.id, text="У вас нету сохраненных мест нажмите /add что б добвить новое место")
 
 
-
-
-
 @bot.message_handler(commands=['near_locations'])
 def handle_home_position(message) -> None:
     bot.send_message(message.chat.id, text="Отправь локацию на что бы узнать есть ли здесь какие-нибудь места")
     bot.register_next_step_handler(message, get_near_locations)
 
+
+def make_keyboard(options=('Да', 'Нет')):
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    buttons = [types.InlineKeyboardButton(o, callback_data=o) for o in options]
+    keyboard.add(*buttons)
+    return keyboard
 
 
 @bot.message_handler(commands=['add'])
@@ -125,28 +128,36 @@ def handle_adding(message) -> None:
     @bot.message_handler(func=lambda message: get_state(message) == title)
     def handle_title(message) -> None:
         update_product(message.chat.id, 'title', message.text)
-        bot.send_message(message.chat.id, text="Давай скорей фотку кидай, если без фото напиши слово 'нет' ")
+        bot.send_message(message.chat.id, text="Выбери с фото или без", reply_markup=make_keyboard(('Фото', 'Нет')))
         update_state(message, photo)
 
-    @bot.message_handler(func=lambda message: get_state(message) == photo, content_types=['photo'])
-    def handle_photo(message) -> None:
-        update_product(message.chat.id, 'photo', get_img(message))
-        bot.send_message(message.chat.id, text="А теперь отправь локацию ")
-        update_state(message, location)
 
-    @bot.message_handler(func=lambda message: get_state(message) == photo, content_types=['text'])
-    def handle_refusal_photo(message) -> None:
-        if message.text.lower() == 'нет':
-            update_product(message.chat.id, 'photo', 'Без фото')
-            bot.send_message(message.chat.id, text="А теперь отправь локацию")
+    @bot.callback_query_handler(func=lambda call: get_state(call.message) == photo)
+    def handle_refusal_photo(callback_query) -> None:
+        if callback_query.data == 'Нет':
+            update_product(callback_query.message.chat.id, 'photo', 'Без фото')
+            bot.send_message(callback_query.message.chat.id, text="А теперь отправь локацию")
+            update_state(callback_query.message, location)
+        elif callback_query.data == 'Фото':
+            bot.send_message(callback_query.message.chat.id, text="Давай скорее фото")
+            bot.register_next_step_handler(callback_query.message, handle_photo)
+
+    def handle_photo(message):
+        try:
+            update_product(message.chat.id, 'photo', get_img(message))
+            bot.send_message(message.chat.id, text="А теперь отправь локацию ")
             update_state(message, location)
+        except TypeError:
+            bot.send_message(message.chat.id, text="Упс что-то не так давайте заново.Нажмите /start")
+            return
 
     @bot.message_handler(func=lambda message: get_state(message) == location, content_types=['location'])
     def handle_location(message) -> None:
         try:
             update_product(message.chat.id, 'latitude', message.location.latitude)
             update_product(message.chat.id, 'longitude', message.location.longitude)
-            bot.send_message(message.chat.id, text="Подтвердить, да/нет?")
+            bot.send_message(message.chat.id, "Если вы действительно хотите добавить то нажмите да, иначе нет",
+                             reply_markup=make_keyboard())
             update_state(message, success)
         except Exception as ex:
             print(ex)
@@ -154,27 +165,30 @@ def handle_adding(message) -> None:
     def save_to_db(data) -> None:
         db.insert_new_place(data)
 
-    @bot.message_handler(func=lambda message: get_state(message) == success, content_types=['text'])
-    def success_handle(message):
-        global product_state
-        if message.text.lower() != 'нет':
-            data = product_state[message.chat.id]
-            data['user_id'] = message.chat.id
+    @bot.callback_query_handler(func=lambda call: get_state(call.message) == success)
+    def success_handle(callback_query):
+        print()
+        if callback_query.data == 'Да':
+            data = get_product(callback_query.message.chat.id)
+            data['user_id'] = callback_query.message.chat.id
             save_to_db(data)
-            bot.send_message(message.chat.id, text=data['title'])
+            bot.send_message(callback_query.message.chat.id, text=data['title'])
             try:
 
                 with open(data['photo'], 'rb') as f:
                     img = f.read()
-                bot.send_photo(message.chat.id, photo=img)
+                bot.send_photo(callback_query.message.chat.id, photo=img)
             except FileNotFoundError:
-                bot.send_message(message.chat.id, data['photo'])
-            bot.send_location(message.chat.id, latitude=data['latitude'], longitude=data['longitude'])
-            bot.send_message(message.chat.id, text='Успешно отправленно')
-            update_state(message, state=start)
+                bot.send_message(callback_query.message.chat.id, data['photo'])
+            bot.send_location(callback_query.message.chat.id, latitude=data['latitude'], longitude=data['longitude'])
+            bot.send_message(callback_query.message.chat.id, text='Успешно отправленно')
+            update_state(callback_query.message, state=start)
         else:
-            product_state = defaultdict(lambda: {})
-            bot.register_next_step_handler(message, describe_option)
+            bot.send_message(callback_query.message.chat.id, text='Вы отменили отправку места')
+            update_state(callback_query.message, state=start)
+            return
+
+
 
 
 @bot.message_handler(commands=['reset'])
@@ -191,9 +205,9 @@ def remove_from_media(user_photos):
         file_list = [f for f in os.listdir("media/") if f in photos]
         for f in file_list:
             os.remove(os.path.join("media/", f))
-    except OSError:
+    except OSError as e:
+        logger.error(e)
         pass
-
 
 
 @bot.message_handler(commands=['list'])
@@ -205,9 +219,12 @@ def handle_showing(message):
     else:
         bot.send_message(message.chat.id, 'У Вас нету локацый')
 
-
-if __name__ == '__main__':
+@logger.catch()
+def main():
     bot.polling(none_stop=True)
 
+
+if __name__ == '__main__':
+    main()
 
 
